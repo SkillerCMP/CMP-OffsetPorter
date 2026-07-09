@@ -60,7 +60,18 @@ jobs:
 
           $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
           if (Test-Path $vswhere) {
-            & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -format table
+            $vsJson = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -format json
+            if ($LASTEXITCODE -eq 0 -and $vsJson) {
+              $vsInfo = $vsJson | ConvertFrom-Json
+              foreach ($vs in @($vsInfo)) {
+                Write-Host "Visual Studio: $($vs.displayName)"
+                Write-Host "Version:       $($vs.catalog.productDisplayVersion)"
+                Write-Host "Install path:  $($vs.installationPath)"
+              }
+            }
+            else {
+              Write-Host "No Visual Studio install with the C++ x64/x86 tools was found by vswhere."
+            }
           }
           else {
             Write-Host "vswhere.exe was not found at the usual path."

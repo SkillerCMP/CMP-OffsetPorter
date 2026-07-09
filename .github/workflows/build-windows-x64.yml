@@ -1,0 +1,108 @@
+name: Build Windows x64
+
+on:
+  workflow_dispatch:
+    inputs:
+      configuration:
+        description: Build configuration
+        required: true
+        default: Release
+        type: choice
+        options:
+          - Release
+          - Debug
+          - RelWithDebInfo
+          - MinSizeRel
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - '.github/workflows/build-windows-x64.yml'
+      - '0-BUILD-WINDOWS7-x64.cmd'
+      - 'CMakeLists.txt'
+      - 'src/**'
+      - 'resources/**'
+      - 'tools/**'
+  pull_request:
+    paths:
+      - '.github/workflows/build-windows-x64.yml'
+      - '0-BUILD-WINDOWS7-x64.cmd'
+      - 'CMakeLists.txt'
+      - 'src/**'
+      - 'resources/**'
+      - 'tools/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  BUILD_CONFIGURATION: ${{ github.event.inputs.configuration || 'Release' }}
+
+jobs:
+  build-windows-x64:
+    name: Windows x64 / Windows 7 API target
+    runs-on: windows-2022
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v5
+
+      - name: Show build toolchain
+        shell: pwsh
+        run: |
+          cmake --version
+
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          if (Test-Path $vswhere) {
+            & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -format table
+          }
+          else {
+            Write-Host "vswhere.exe was not found at the usual path."
+          }
+
+      - name: Build OffsetPorter
+        shell: cmd
+        run: |
+          call 0-BUILD-WINDOWS7-x64.cmd %BUILD_CONFIGURATION% clean v143
+
+      - name: Package executable
+        if: success()
+        shell: pwsh
+        run: |
+          $dist = "0-Finished\dist"
+          $exe = Join-Path $dist "OffsetPorter.exe"
+          if (!(Test-Path $exe)) {
+            throw "Expected executable was not generated: $exe"
+          }
+
+          $zip = Join-Path $dist "OffsetPorter-Windows7-x64.zip"
+          if (Test-Path $zip) { Remove-Item -LiteralPath $zip -Force }
+          Compress-Archive -LiteralPath $exe -DestinationPath $zip -Force
+
+          Get-ChildItem -LiteralPath $dist | Format-Table Name, Length, LastWriteTime
+
+      - name: Upload executable artifact
+        if: success()
+        uses: actions/upload-artifact@v6
+        with:
+          name: OffsetPorter-Windows7-x64
+          path: |
+            0-Finished/dist/OffsetPorter.exe
+            0-Finished/dist/OffsetPorter-Windows7-x64.zip
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload build logs
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: OffsetPorter-build-logs
+          path: 0-Finished/logs/*.log
+          if-no-files-found: ignore
+          retention-days: 14

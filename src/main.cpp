@@ -38,7 +38,7 @@
 
 namespace
 {
-    constexpr wchar_t kAppTitle[] = L"Offset Porter v1.00.8";
+    constexpr wchar_t kAppTitle[] = L"Offset Porter C++17 v1.00.9";
     constexpr UINT kLargeTextLimit = 0x7FFFFFFEu;
 
     enum class GSheetsLayout { AcrossColumns, DownRows };
